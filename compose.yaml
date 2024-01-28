@@ -1,8 +1,14 @@
 services:
   nadeco:
+    container_name: nadeco
     image: nadeco:latest
     build:
       context: .
       dockerfile: Dockerfile
+    restart: always
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./config.yaml:/config.yaml
     ports:
       - 53:53/udp
