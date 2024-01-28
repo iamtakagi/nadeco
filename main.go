@@ -21,13 +21,6 @@ type DNS struct {
 	Records []Record `yaml:"records"`
 }
 
-func NewDNS(records []Record, nameservers []string) *DNS {
-	return &DNS{
-		NameServers: nameservers,
-		Records:     records,
-	}
-}
-
 func loadConfig() (*DNS, error) {
 	data, err := os.ReadFile("config.yaml")
 	if err != nil {
