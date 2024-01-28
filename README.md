@@ -5,7 +5,7 @@
 nameservers: ['8.8.8.8', '8.8.4.4']
 records:
   - target: '127.0.0.1'
-    values: ['local.example.dev']
+    values: ['local.example.dev.']
     type: 'A'
 ```
 
