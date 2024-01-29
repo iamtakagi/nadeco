@@ -1,24 +1,24 @@
 package main
 
 import (
+	"github.com/miekg/dns"
+	"gopkg.in/yaml.v3"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
-	"github.com/miekg/dns"
-	"gopkg.in/yaml.v3"
 )
 
 type Record struct {
 	Target string
 	Values []string
-	Type string
+	Type   string
 }
 
 type DNS struct {
 	NameServers []string `yaml:"nameservers"`
-	Records []Record `yaml:"records"`
+	Records     []Record `yaml:"records"`
 }
 
 func loadConfig() (*DNS, error) {
@@ -36,7 +36,7 @@ func loadConfig() (*DNS, error) {
 	return &dns, nil
 }
 
-func Boot(s *DNS) (*dns.Server) {
+func Boot(s *DNS) *dns.Server {
 	log.Printf("Serving %s and forwarding rest to %s\n", s.Records, s.NameServers)
 
 	dns.HandleFunc(".", func(w dns.ResponseWriter, req *dns.Msg) {
@@ -52,26 +52,26 @@ func Boot(s *DNS) (*dns.Server) {
 						defer w.WriteMsg(m)
 
 						log.Printf("Resolve DNS query for %#v to %s (%s)", q.Name, record.Target, record.Type)
-						
+
 						switch record.Type {
-							case "A":
-								m.Answer = append(m.Answer, &dns.A{
-									A:   net.ParseIP(record.Target),
-									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeA},
-								})
-							case "CNAME":
-								m.Answer = append(m.Answer, &dns.CNAME{
-									Target: record.Target,
-									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeCNAME},
-								})
-							case "SRV":
-								m.Answer = append(m.Answer, &dns.SRV{
-									Target: record.Target,
-									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeSRV},
-								})
-							default:
-								log.Printf("Unknown record type %s", record.Type)
-							}
+						case "A":
+							m.Answer = append(m.Answer, &dns.A{
+								A:   net.ParseIP(record.Target),
+								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeA},
+							})
+						case "CNAME":
+							m.Answer = append(m.Answer, &dns.CNAME{
+								Target: record.Target,
+								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeCNAME},
+							})
+						case "SRV":
+							m.Answer = append(m.Answer, &dns.SRV{
+								Target: record.Target,
+								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeSRV},
+							})
+						default:
+							log.Printf("Unknown record type %s", record.Type)
+						}
 						return
 					}
 				}
