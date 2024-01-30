@@ -1,13 +1,15 @@
 package main
 
 import (
-	"github.com/miekg/dns"
-	"gopkg.in/yaml.v3"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
+
+	"github.com/miekg/dns"
+	"golang.org/x/text/cases"
+	"gopkg.in/yaml.v3"
 )
 
 type Record struct {
@@ -54,21 +56,42 @@ func Boot(s *DNS) *dns.Server {
 						log.Printf("Resolve DNS query for %#v to %s (%s)", q.Name, record.Target, record.Type)
 
 						switch record.Type {
-						case "A":
+						case "A": // IPv4
 							m.Answer = append(m.Answer, &dns.A{
 								A:   net.ParseIP(record.Target),
 								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeA},
 							})
-						case "CNAME":
+						case "AAAA": // IPv6
+							m.Answer = append(m.Answer, &dns.AAAA{
+								AAAA:  net.ParseIP(record.Target),
+								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeAAAA},
+							});
+						case "CNAME": // Alias
 							m.Answer = append(m.Answer, &dns.CNAME{
 								Target: record.Target,
 								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeCNAME},
 							})
-						case "SRV":
+						case "SRV": // Service
 							m.Answer = append(m.Answer, &dns.SRV{
 								Target: record.Target,
 								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeSRV},
 							})
+						case "TXT": // Text
+							m.Answer = append(m.Answer, &dns.TXT{
+								Txt: []string{record.Target},
+								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeTXT},
+							})
+						case "MX": // Mail
+							m.Answer = append(m.Answer, &dns.MX{
+								Mx:  record.Target,
+								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeMX},
+							})
+						case "NS": // NameServer
+							m.Ns = append(m.Ns, &dns.NS{
+								Ns:  record.Target,
+								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeNS},
+							});
+
 						default:
 							log.Printf("Unknown record type %s", record.Type)
 						}
