@@ -38,7 +38,7 @@ func loadConfig() (*DNS, error) {
 	return &dns, nil
 }
 
-func Boot(s *DNS) *dns.Server {
+func Handle(s *DNS) *dns.Server {
 	log.Printf("Serving %v and forwarding rest to %s\n", s.Records, s.NameServers)
 
 	dns.HandleFunc(".", func(w dns.ResponseWriter, req *dns.Msg) {
@@ -150,5 +150,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	Boot(dns)
+	Handle(dns)
 }
