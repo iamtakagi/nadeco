@@ -8,14 +8,14 @@ import (
 	"strings"
 
 	"github.com/miekg/dns"
-	"golang.org/x/text/cases"
 	"gopkg.in/yaml.v3"
 )
 
 type Record struct {
-	Target string
-	Values []string
-	Type   string
+	Target string   `yaml:"target"`
+	Values []string `yaml:"values"`
+	Type   string   `yaml:"type"`
+	Ttl    int      `yaml:"ttl"`
 }
 
 type DNS struct {
@@ -39,63 +39,64 @@ func loadConfig() (*DNS, error) {
 }
 
 func Boot(s *DNS) *dns.Server {
-	log.Printf("Serving %s and forwarding rest to %s\n", s.Records, s.NameServers)
+	log.Printf("Serving %v and forwarding rest to %s\n", s.Records, s.NameServers)
 
 	dns.HandleFunc(".", func(w dns.ResponseWriter, req *dns.Msg) {
 		for _, q := range req.Question {
 			log.Printf("DNS query for %#v", q.Name)
 
 			for _, record := range s.Records {
-				for _, value := range record.Values {
-					if strings.HasSuffix(q.Name, value) {
-						m := new(dns.Msg)
-						m.SetReply(req)
-						m.Authoritative = true
-						defer w.WriteMsg(m)
+				qTypeStr := dns.TypeToString[q.Qtype]
+				if qTypeStr == record.Type {
+					for _, value := range record.Values {
+						if strings.HasSuffix(q.Name, value) {
+							m := new(dns.Msg)
+							m.SetReply(req)
+							m.Authoritative = true
+							defer w.WriteMsg(m)
 
-						log.Printf("Resolve DNS query for %#v to %s (%s)", q.Name, record.Target, record.Type)
+							switch record.Type {
+							case "A": // IPv4
+								m.Answer = append(m.Answer, &dns.A{
+									A:   net.ParseIP(record.Target),
+									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeA},
+								})
+							case "AAAA": // IPv6
+								m.Answer = append(m.Answer, &dns.AAAA{
+									AAAA: net.ParseIP(record.Target),
+									Hdr:  dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeAAAA},
+								})
+							case "CNAME": // Alias
+								m.Answer = append(m.Answer, &dns.CNAME{
+									Target: record.Target,
+									Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeCNAME},
+								})
+							case "SRV": // Service
+								m.Answer = append(m.Answer, &dns.SRV{
+									Target: record.Target,
+									Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeSRV},
+								})
+							case "TXT": // Text
+								m.Answer = append(m.Answer, &dns.TXT{
+									Txt: []string{record.Target},
+									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeTXT},
+								})
+							case "MX": // Mail
+								m.Answer = append(m.Answer, &dns.MX{
+									Mx:  record.Target,
+									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeMX},
+								})
+							case "NS": // NameServer
+								m.Ns = append(m.Ns, &dns.NS{
+									Ns:  record.Target,
+									Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: uint32(record.Ttl), Rrtype: dns.TypeNS},
+								})
 
-						switch record.Type {
-						case "A": // IPv4
-							m.Answer = append(m.Answer, &dns.A{
-								A:   net.ParseIP(record.Target),
-								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeA},
-							})
-						case "AAAA": // IPv6
-							m.Answer = append(m.Answer, &dns.AAAA{
-								AAAA:  net.ParseIP(record.Target),
-								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeAAAA},
-							});
-						case "CNAME": // Alias
-							m.Answer = append(m.Answer, &dns.CNAME{
-								Target: record.Target,
-								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeCNAME},
-							})
-						case "SRV": // Service
-							m.Answer = append(m.Answer, &dns.SRV{
-								Target: record.Target,
-								Hdr:    dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeSRV},
-							})
-						case "TXT": // Text
-							m.Answer = append(m.Answer, &dns.TXT{
-								Txt: []string{record.Target},
-								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeTXT},
-							})
-						case "MX": // Mail
-							m.Answer = append(m.Answer, &dns.MX{
-								Mx:  record.Target,
-								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeMX},
-							})
-						case "NS": // NameServer
-							m.Ns = append(m.Ns, &dns.NS{
-								Ns:  record.Target,
-								Hdr: dns.RR_Header{Name: q.Name, Class: q.Qclass, Ttl: 0, Rrtype: dns.TypeNS},
-							});
-
-						default:
-							log.Printf("Unknown record type %s", record.Type)
+							default:
+								log.Printf("Unknown record type %s", record.Type)
+							}
+							return
 						}
-						return
 					}
 				}
 			}

@@ -5,8 +5,17 @@
 nameservers: ['8.8.8.8', '8.8.4.4']
 records:
   - target: '127.0.0.1'
-    values: ['local.example.dev.']
+    values: ['local.example.com.']
     type: 'A'
+    ttl: 0
+  - target: '127.0.0.1'
+    values: ['www.local.example.com.']
+    type: 'CNAME'
+    ttl: 0
+  - target: '74.125.202.108'
+    values: ['smtp.gmail.com.']
+    type: 'MX'
+    ttl: 0
 ```
 
 ## Installation
